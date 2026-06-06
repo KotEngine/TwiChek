@@ -408,6 +408,7 @@ body {
   async function tsFetch() {
     let username = document.getElementById('ts-url').value.trim().toLowerCase();
     username = username.replace(/^(https?:\/\/)?(www\.)?twitch\.tv\//, '');
+    username = username.split(/[?\/]/)[0];
     const statusDiv = document.getElementById('ts-status');
     const resultDiv = document.getElementById('ts-result');
     const btn = document.getElementById('ts-fetchbtn');

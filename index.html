@@ -447,7 +447,7 @@ body {
           const [gameRes, titleRes, viewersRes] = await Promise.all([
             safeFetch(`${DECAPI}/game/${username}`),
             safeFetch(`${DECAPI}/status/${username}`),
-            safeFetch(`${DECAPI}/viewers/${username}`)
+            safeFetch(`${DECAPI}/viewercount/${username}`)
           ]);
           game = gameRes;
           streamTitle = titleRes;

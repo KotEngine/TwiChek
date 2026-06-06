@@ -380,8 +380,8 @@ body {
 <script>
   let currentLang = 'en';
   const i18n = {
-    en: { subtitle: 'Look up any Twitch streamer — live status & stats', placeholder: 'Enter Twitch username…', searchLabel: 'Search', fetching: 'Fetching data…', noInput: 'Please enter a Twitch username.', notFound: 'Streamer not found.', networkErr: 'Network error. Try again.', offline: 'Offline', created: 'Created', uptime: 'Stream Time', open: 'Open on Twitch' },
-    ru: { subtitle: 'Найдите любого стримера на Twitch — статус и статистика', placeholder: 'Введите ник стримера…', searchLabel: 'Найти', fetching: 'Загружаем данные…', noInput: 'Введите ник стримера.', notFound: 'Стример не найден.', networkErr: 'Ошибка сети. Попробуйте снова.', offline: 'Офлайн', created: 'Создан', uptime: 'Время стрима', open: 'Открыть на Twitch' }
+    en: { subtitle: 'Look up any Twitch streamer — live status & stats', placeholder: 'Enter Twitch username…', searchLabel: 'Search', fetching: 'Fetching data…', noInput: 'Please enter a Twitch username.', notFound: 'Streamer not found.', networkErr: 'Network error. Try again.', offline: 'Offline', created: 'Created', uptime: 'Stream Time', open: 'Open on Twitch', followers: 'followers' },
+    ru: { subtitle: 'Найдите любого стримера на Twitch — статус и статистика', placeholder: 'Введите ник стримера…', searchLabel: 'Найти', fetching: 'Загружаем данные…', noInput: 'Введите ник стримера.', notFound: 'Стример не найден.', networkErr: 'Ошибка сети. Попробуйте снова.', offline: 'Офлайн', created: 'Создан', uptime: 'Время стрима', open: 'Открыть на Twitch', followers: 'подписчиков' }
   };
   function t(k) { return i18n[currentLang][k] || k; }
   function setLang(lang) {
@@ -398,15 +398,15 @@ body {
   }
 
   const DECAPI = 'https://decapi.me/twitch';
-  const PROXY = 'https://api.allorigins.win/raw?url=';
   async function pfetch(url) {
-    const res = await fetch(PROXY + encodeURIComponent(url));
-    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    const res = await fetch(url);
+    if (!res.ok) throw new Error();
     return res;
   }
 
   async function tsFetch() {
-    const username = document.getElementById('ts-url').value.trim().toLowerCase();
+    let username = document.getElementById('ts-url').value.trim().toLowerCase();
+    username = username.replace(/^(https?:\/\/)?(www\.)?twitch\.tv\//, '');
     const statusDiv = document.getElementById('ts-status');
     const resultDiv = document.getElementById('ts-result');
     const btn = document.getElementById('ts-fetchbtn');
@@ -419,33 +419,42 @@ body {
     btn.disabled = true;
 
     try {
-      const [avatarRes, followersRes, createdRes, uptimeRes] = await Promise.all([
-        pfetch(`${DECAPI}/avatar/${username}`),
-        pfetch(`${DECAPI}/followcount/${username}`),
-        pfetch(`${DECAPI}/creation/${username}?format=d.m.Y`),
-        pfetch(`${DECAPI}/uptime/${username}`)
+      const safeFetch = async (url, fallback = '') => {
+        try {
+          const res = await pfetch(url);
+          return res.ok ? await res.text() : fallback;
+        } catch (e) {
+          return fallback;
+        }
+      };
+
+      const [avatarUrl, followers, created, uptimeRaw] = await Promise.all([
+        safeFetch(`${DECAPI}/avatar/${username}`),
+        safeFetch(`${DECAPI}/followcount/${username}`),
+        safeFetch(`${DECAPI}/creation/${username}?format=d.m.Y`),
+        safeFetch(`${DECAPI}/uptime/${username}`)
       ]);
-      const avatarUrl = await avatarRes.text();
-      const followers = await followersRes.text();
-      const created = await createdRes.text();
-      const uptimeRaw = await uptimeRes.text();
-      if (followers.includes('invalid') || avatarUrl.includes('error')) { showError(t('notFound')); btn.disabled = false; return; }
-      const isLive = !uptimeRaw.toLowerCase().includes('offline') && !uptimeRaw.includes('error') && !uptimeRaw.includes('is not live');
+
+      if (!avatarUrl || avatarUrl.includes('error') || followers.includes('invalid') || !followers) { 
+        showError(t('notFound')); 
+        btn.disabled = false; 
+        return; 
+      }
+      const isLive = uptimeRaw && !uptimeRaw.toLowerCase().includes('offline') && !uptimeRaw.includes('error') && !uptimeRaw.includes('is not live');
       let game = '', streamTitle = '', viewers = '—';
       if (isLive) {
         try {
           const [gameRes, titleRes, viewersRes] = await Promise.all([
-            pfetch(`${DECAPI}/game/${username}`),
-            pfetch(`${DECAPI}/status/${username}`),
-            pfetch(`${DECAPI}/viewers/${username}`)
+            safeFetch(`${DECAPI}/game/${username}`),
+            safeFetch(`${DECAPI}/status/${username}`),
+            safeFetch(`${DECAPI}/viewers/${username}`)
           ]);
-          game = await gameRes.text();
-          streamTitle = await titleRes.text();
-          const viewersText = await viewersRes.text();
-          if (!viewersText.includes('error') && !viewersText.includes('404')) viewers = viewersText.trim() || '—';
+          game = gameRes;
+          streamTitle = titleRes;
+          if (viewersRes && !viewersRes.includes('error') && !viewersRes.includes('404')) viewers = viewersRes.trim() || '—';
         } catch(e) { viewers = '—'; }
       }
-      buildResult({ username, avatarUrl: avatarUrl.trim(), followers: followers.trim(), created: created.trim(), isLive, uptime: uptimeRaw.trim(), game: game.trim(), streamTitle: streamTitle.trim(), viewers });
+      buildResult({ username, avatarUrl: avatarUrl.trim(), followers: followers.trim(), created: created.trim() || '—', isLive, uptime: uptimeRaw.trim(), game: game.trim(), streamTitle: streamTitle.trim(), viewers });
       resultDiv.style.display = 'block';
       statusDiv.className = 'ts-status';
     } catch(e) { showError(t('networkErr')); console.error(e); }
@@ -468,7 +477,7 @@ body {
       document.getElementById('ts-game').textContent = game || '';
       document.getElementById('ts-stream-title').textContent = streamTitle || '';
       document.getElementById('ts-viewers').textContent = fmtNum(viewers);
-      document.getElementById('ts-live-sub').textContent = `${fmtNum(followers)} followers`;
+      document.getElementById('ts-live-sub').textContent = `${fmtNum(followers)} ${t('followers')}`;
       document.getElementById('ts-stat-uptime').textContent = uptime;
     }
     document.getElementById('ts-twitch-link').href = `https://twitch.tv/${username}`;
@@ -478,8 +487,8 @@ body {
     if (val === '—') return '—';
     const n = parseInt(String(val).replace(/[^0-9]/g, ''), 10);
     if (isNaN(n)) return val;
-    if (n >= 1_000_000) return (n/1_000_000).toFixed(1).replace('.0','')+'M';
-    if (n >= 1_000) return (n/1_000).toFixed(1).replace('.0','')+'K';
+    if (n >= 1000000) return (n/1000000).toFixed(1).replace('.0','')+'M';
+    if (n >= 1000) return (n/1000).toFixed(1).replace('.0','')+'K';
     return n.toLocaleString();
   }
 

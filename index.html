@@ -278,6 +278,8 @@ body {
 }
 .ts-footer-author { font-size: 13px; font-weight: 600; color: #444; }
 .ts-footer-author span { color: var(--accent); }
+.ts-footer-sub a { color: #444; text-decoration: underline; transition: color 0.15s; }
+.ts-footer-sub a:hover { color: var(--accent); }
 
 .ts-lang {
   position: fixed;
@@ -367,6 +369,14 @@ body {
           <div class="ts-stat-label"><i class="ti ti-calendar"></i> <span id="lbl-created">Created</span></div>
           <div class="ts-stat-value" id="ts-stat-created">—</div>
         </div>
+        <div class="ts-stat-card" id="ts-followers-card">
+          <div class="ts-stat-label"><i class="ti ti-users"></i> <span id="lbl-followers-card">Followers</span></div>
+          <div class="ts-stat-value" id="ts-stat-followers-card">—</div>
+        </div>
+        <div class="ts-stat-card">
+          <div class="ts-stat-label"><i class="ti ti-hash"></i> <span id="lbl-id">Twitch ID</span></div>
+          <div class="ts-stat-value" id="ts-stat-id">—</div>
+        </div>
         <div class="ts-stat-card" id="ts-uptime-card" style="display:none;">
           <div class="ts-stat-label"><i class="ti ti-clock"></i> <span id="lbl-uptime">Stream Time</span></div>
           <div class="ts-stat-value" id="ts-stat-uptime">—</div>
@@ -375,14 +385,14 @@ body {
       <a class="ts-open-btn" id="ts-twitch-link" href="#" target="_blank"><i class="ti ti-brand-twitch"></i> <span id="lbl-open">Open on Twitch</span></a>
     </div>
   </div>
-  <div class="ts-footer"><div class="ts-footer-author">by <span>SantianDev</span></div><div class="ts-footer-sub">TwiChek — open source</div></div>
+  <div class="ts-footer"><div class="ts-footer-author">by <span>SantianDev</span></div><div class="ts-footer-sub">TwiChek — <a href="https://github.com/KotEngine/TwiChek" target="_blank">open source</a></div></div>
 </div>
 
 <script>
   let currentLang = 'en';
   const i18n = {
-    en: { subtitle: 'Look up any Twitch streamer — live status & stats', placeholder: 'Enter Twitch username…', searchLabel: 'Search', fetching: 'Fetching data…', noInput: 'Please enter a Twitch username.', notFound: 'Streamer not found.', networkErr: 'Network error. Try again.', offline: 'Offline', created: 'Created', uptime: 'Stream Time', open: 'Open on Twitch', followers: 'followers' },
-    ru: { subtitle: 'Найдите любого стримера на Twitch — статус и статистика', placeholder: 'Введите ник стримера…', searchLabel: 'Найти', fetching: 'Загружаем данные…', noInput: 'Введите ник стримера.', notFound: 'Стример не найден.', networkErr: 'Ошибка сети. Попробуйте снова.', offline: 'Офлайн', created: 'Создан', uptime: 'Время стрима', open: 'Открыть на Twitch', followers: 'подписчиков' }
+    en: { subtitle: 'Look up any Twitch streamer — live status & stats', placeholder: 'Enter Twitch username…', searchLabel: 'Search', fetching: 'Fetching data…', noInput: 'Please enter a Twitch username.', notFound: 'Streamer not found.', networkErr: 'Network error. Try again.', offline: 'Offline', created: 'Created', uptime: 'Stream Time', open: 'Open on Twitch', followers_card: 'Followers', followers_small: 'followers', id: 'Twitch ID' },
+    ru: { subtitle: 'Найдите любого стримера на Twitch — статус и статистика', placeholder: 'Введите ник стримера…', searchLabel: 'Найти', fetching: 'Загружаем данные…', noInput: 'Введите ник стримера.', notFound: 'Стример не найден.', networkErr: 'Ошибка сети. Попробуйте снова.', offline: 'Офлайн', created: 'Создан', uptime: 'Время стрима', open: 'Открыть на Twitch', followers_card: 'Фолловеры', followers_small: 'фолловеров', id: 'Twitch ID' }
   };
   function t(k) { return i18n[currentLang][k] || k; }
   function setLang(lang) {
@@ -393,6 +403,8 @@ body {
     document.getElementById('ts-url').placeholder = t('placeholder');
     document.getElementById('ts-fetch-label').textContent = t('searchLabel');
     document.getElementById('lbl-created').textContent = t('created');
+    document.getElementById('lbl-followers-card').textContent = t('followers_card');
+    document.getElementById('lbl-id').textContent = t('id');
     document.getElementById('lbl-uptime').textContent = t('uptime');
     document.getElementById('lbl-open').textContent = t('open');
     document.getElementById('ts-offline-label').textContent = t('offline');
@@ -430,11 +442,12 @@ body {
         }
       };
 
-      const [avatarUrl, followers, created, uptimeRaw] = await Promise.all([
+      const [avatarUrl, followers, created, uptimeRaw, twitchId] = await Promise.all([
         safeFetch(`${DECAPI}/avatar/${username}`),
         safeFetch(`${DECAPI}/followcount/${username}`),
         safeFetch(`${DECAPI}/creation/${username}?format=d.m.Y`),
-        safeFetch(`${DECAPI}/uptime/${username}`)
+        safeFetch(`${DECAPI}/uptime/${username}`),
+        safeFetch(`${DECAPI}/id/${username}`)
       ]);
 
       if (!avatarUrl || avatarUrl.includes('error') || followers.includes('invalid') || !followers) { 
@@ -456,7 +469,7 @@ body {
           if (viewersRes && !viewersRes.includes('error') && !viewersRes.includes('404')) viewers = viewersRes.trim() || '—';
         } catch(e) { viewers = '—'; }
       }
-      buildResult({ username, avatarUrl: avatarUrl.trim(), followers: followers.trim(), created: created.trim() || '—', isLive, uptime: uptimeRaw.trim(), game: game.trim(), streamTitle: streamTitle.trim(), viewers });
+      buildResult({ username, avatarUrl: avatarUrl.trim(), followers: followers.trim(), created: created.trim() || '—', isLive, uptime: uptimeRaw.trim(), game: game.trim(), streamTitle: streamTitle.trim(), viewers, id: twitchId.trim() });
       resultDiv.style.display = 'block';
       statusDiv.className = 'ts-status';
     } catch(e) { showError(t('networkErr')); console.error(e); }
@@ -464,22 +477,27 @@ body {
   }
 
   function buildResult(d) {
-    const { username, avatarUrl, followers, created, isLive, uptime, game, streamTitle, viewers } = d;
+    const { username, avatarUrl, followers, created, isLive, uptime, game, streamTitle, viewers, id } = d;
     document.getElementById('ts-avatar-live').src = avatarUrl;
     document.getElementById('ts-avatar-off').src = avatarUrl;
     document.getElementById('ts-name-live').textContent = username;
     document.getElementById('ts-name-off').textContent = username;
     document.getElementById('ts-live-section').style.display = isLive ? 'block' : 'none';
     document.getElementById('ts-offline-section').style.display = isLive ? 'none' : 'block';
+    
+    document.getElementById('ts-followers-card').style.display = isLive ? 'none' : '';
     document.getElementById('ts-uptime-card').style.display = isLive ? '' : 'none';
+    
     document.getElementById('ts-stat-created').textContent = created;
+    document.getElementById('ts-stat-followers-card').textContent = fmtNum(followers);
+    document.getElementById('ts-stat-id').textContent = id || '—';
     if (isLive) {
       const previewUrl = `https://static-cdn.jtvnw.net/previews-ttv/live_user_${username}-640x360.jpg?t=${Date.now()}`;
       document.getElementById('ts-preview-img').src = previewUrl;
       document.getElementById('ts-game').textContent = game || '';
       document.getElementById('ts-stream-title').textContent = streamTitle || '';
       document.getElementById('ts-viewers').textContent = fmtNum(viewers);
-      document.getElementById('ts-live-sub').textContent = `${fmtNum(followers)} ${t('followers')}`;
+      document.getElementById('ts-live-sub').textContent = `${fmtNum(followers)} ${t('followers_small')}`;
       document.getElementById('ts-stat-uptime').textContent = uptime;
     }
     document.getElementById('ts-twitch-link').href = `https://twitch.tv/${username}`;
